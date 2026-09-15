@@ -1,0 +1,1391 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Delta Tennis (YMCA) — Turnos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg:#EDEAE1;
+    --surface:#FFFFFF;
+    --surface-soft:#F6F4EC;
+    --ink:#182620;
+    --ink-soft:#5C6860;
+    --line:#DAD5C6;
+    --line-strong:#C3BCA8;
+    --accent:#9CB233;
+    --accent-ink:#26310F;
+    --danger:#B8503F;
+    --danger-soft:#F5E1DC;
+    --pending-stripe: rgba(24,38,32,0.16);
+    --profesor:#E4B93C;
+    --profesor-ink:#2E2607;
+    --escuela:#D97730;
+    --alquiler:#4F8A3E;
+    --mantenimiento:#BA3B2E;
+    --daom:#3E6B8A;
+    --marianistas:#7C6A9C;
+    --radius:10px;
+    --radius-sm:6px;
+    --font-display:'Space Grotesk', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --font-body:'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --shadow: 0 1px 2px rgba(24,38,32,0.06), 0 6px 20px rgba(24,38,32,0.06);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#12140F;
+      --surface:#1C2019;
+      --surface-soft:#20241C;
+      --ink:#EDECE4;
+      --ink-soft:#A2A99B;
+      --line:#33372C;
+      --line-strong:#454A3B;
+      --accent:#B7CE45;
+      --accent-ink:#182207;
+      --danger:#E28874;
+      --danger-soft:#3A2420;
+      --pending-stripe: rgba(237,236,228,0.14);
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 6px 20px rgba(0,0,0,0.35);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#12140F;
+    --surface:#1C2019;
+    --surface-soft:#20241C;
+    --ink:#EDECE4;
+    --ink-soft:#A2A99B;
+    --line:#33372C;
+    --line-strong:#454A3B;
+    --accent:#B7CE45;
+    --accent-ink:#182207;
+    --danger:#E28874;
+    --danger-soft:#3A2420;
+    --pending-stripe: rgba(237,236,228,0.14);
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 6px 20px rgba(0,0,0,0.35);
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--font-body);
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+  .app{
+    max-width:1180px;
+    margin:0 auto;
+    padding:20px 16px 60px;
+  }
+
+  /* ---------- Header ---------- */
+  header.top{
+    display:flex;
+    align-items:flex-end;
+    justify-content:space-between;
+    gap:16px;
+    flex-wrap:wrap;
+    margin-bottom:18px;
+  }
+  .brand{
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+  }
+  .brand .mark{
+    font-family:var(--font-display);
+    font-weight:700;
+    font-size:26px;
+    letter-spacing:-0.01em;
+    line-height:1;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .brand .mark .dot{
+    width:9px;height:9px;border-radius:50%;
+    background:var(--accent);
+    display:inline-block;
+  }
+  .brand .sub{
+    font-size:13px;
+    color:var(--ink-soft);
+  }
+  .ro-badge{
+    margin-top:4px;
+    display:inline-flex;
+    width:fit-content;
+    align-items:center;
+    gap:6px;
+    font-size:11.5px;
+    font-weight:600;
+    font-family:var(--font-body);
+    color:var(--ink-soft);
+    background:var(--surface-soft);
+    border:1px solid var(--line);
+    padding:5px 12px;
+    border-radius:999px;
+    cursor:pointer;
+  }
+  .ro-badge:hover{ background:var(--line); }
+  .ro-badge.is-editor{ color:var(--accent-ink); background:var(--accent); border-color:transparent; }
+
+  .auth-modal .modal{ max-width:340px; }
+  .auth-error{
+    font-size:12px;
+    color:var(--danger);
+    background:var(--danger-soft);
+    border-radius:var(--radius-sm);
+    padding:8px 10px;
+    display:none;
+  }
+  .auth-error.show{ display:block; }
+
+  .date-nav{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:999px;
+    padding:5px 6px;
+    box-shadow:var(--shadow);
+  }
+  .date-nav button{
+    width:32px;height:32px;
+    border-radius:50%;
+    border:none;
+    background:transparent;
+    color:var(--ink);
+    font-size:16px;
+    cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .date-nav button:hover{background:var(--surface-soft);}
+  .date-nav .today-btn{
+    width:auto;
+    border-radius:999px;
+    padding:0 12px;
+    font-size:12.5px;
+    font-weight:600;
+    color:var(--ink-soft);
+    background:var(--surface-soft);
+  }
+  .date-nav .today-btn.is-active{
+    color:var(--accent-ink);
+    background:var(--accent);
+  }
+  .date-nav .cur-date{
+    font-family:var(--font-display);
+    font-weight:600;
+    font-size:14.5px;
+    min-width:150px;
+    text-align:center;
+    text-transform:capitalize;
+  }
+  .date-nav input[type=date]{
+    position:absolute;
+    opacity:0;
+    width:1px;height:1px;
+    pointer-events:none;
+  }
+
+  /* ---------- Summary strip ---------- */
+  .summary{
+    display:flex;
+    gap:10px;
+    margin-bottom:16px;
+    flex-wrap:wrap;
+  }
+  .summary .pill{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:var(--radius-sm);
+    padding:8px 14px;
+    font-size:13px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    color:var(--ink-soft);
+  }
+  .summary .pill b{
+    color:var(--ink);
+    font-family:var(--font-display);
+    font-size:16px;
+  }
+  .summary .pill.warn b{color:var(--danger);}
+
+  /* ---------- Layout ---------- */
+  .layout{
+    display:grid;
+    grid-template-columns: 1fr 300px;
+    gap:20px;
+    align-items:start;
+  }
+  @media (max-width:880px){
+    .layout{grid-template-columns:1fr;}
+  }
+
+  .panel{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    overflow:hidden;
+  }
+  .panel h2{
+    font-family:var(--font-display);
+    font-size:14px;
+    font-weight:600;
+    margin:0;
+    padding:14px 16px;
+    border-bottom:1px solid var(--line);
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+  }
+  .panel h2 .count{
+    background:var(--surface-soft);
+    color:var(--ink-soft);
+    font-family:var(--font-body);
+    font-size:12px;
+    font-weight:600;
+    padding:2px 8px;
+    border-radius:999px;
+  }
+
+  /* ---------- Schedule grid: fixed time column + independently scrolling courts ---------- */
+  .schedule-flex{
+    display:flex;
+    align-items:flex-start;
+    padding:16px;
+  }
+  .time-col{
+    flex-shrink:0;
+    display:grid;
+    grid-template-rows: repeat(27, 30px);
+    border-top:1px solid var(--line);
+    border-left:1px solid var(--line);
+    border-radius:6px 0 0 6px;
+    overflow:hidden;
+  }
+  .courts-scroll{
+    overflow-x:auto;
+    flex:1;
+    min-width:0;
+  }
+  .courts-grid{
+    display:grid;
+    grid-template-columns: repeat(8, minmax(78px,1fr));
+    grid-auto-rows: 30px;
+    min-width:624px;
+    border-top:1px solid var(--line);
+    border-radius:0 6px 6px 0;
+    overflow:hidden;
+    position:relative;
+  }
+  .cell-head{
+    grid-row:1;
+    background:var(--surface-soft);
+    border-right:1px solid var(--line);
+    border-bottom:1px solid var(--line-strong);
+    font-size:12px;
+    font-weight:600;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:8px 2px;
+    position:sticky;
+    top:0;
+    z-index:3;
+  }
+  .cell-head.corner{ z-index:4; background:var(--surface-soft); }
+  .time-label{
+    border-right:1px solid var(--line-strong);
+    border-bottom:1px solid var(--line);
+    font-size:10.5px;
+    color:var(--ink-soft);
+    display:flex;
+    align-items:flex-start;
+    justify-content:flex-end;
+    padding:2px 6px 0 0;
+    background:var(--surface);
+  }
+  .time-label.hour{ color:var(--ink); font-weight:600; }
+  .time-label.hour-end{ border-bottom:2px solid var(--line-strong); }
+  .slot-empty{
+    border-right:1px solid var(--line);
+    border-bottom:1px solid var(--line);
+    cursor:pointer;
+    transition:background .12s ease;
+  }
+  .slot-empty:hover{ background:var(--surface-soft); }
+  .slot-empty.hour-line{ border-bottom:2px solid var(--line-strong); }
+  .slot-closed{
+    border-right:1px solid var(--line);
+    background:var(--surface-soft);
+  }
+  .slot-empty.dim, .reservation.dim{ opacity:.28; }
+
+  .reservation{
+    margin:1px 2px;
+    border-radius:6px;
+    padding:4px 6px;
+    color:#fff;
+    font-size:11.5px;
+    line-height:1.25;
+    cursor:pointer;
+    overflow:hidden;
+    border:1px solid rgba(0,0,0,0.12);
+    position:relative;
+    z-index:2;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.12);
+    transition: transform .1s ease, box-shadow .1s ease;
+  }
+  .reservation:hover{ transform:translateY(-1px); box-shadow:0 3px 8px rgba(0,0,0,0.18); }
+  .reservation .name{ font-weight:700; display:block; }
+  .reservation .meta{ opacity:.88; font-size:10.5px; display:block; }
+  .reservation.type-profesor{ background:var(--profesor); color:var(--profesor-ink); }
+  .reservation.type-escuela{ background:var(--escuela); }
+  .reservation.type-alquiler{ background:var(--alquiler); }
+  .reservation.type-mantenimiento{ background:var(--mantenimiento); }
+  .reservation.type-daom{ background:var(--daom); }
+  .reservation.type-marianistas{ background:var(--marianistas); }
+  .reservation.st-pendiente{
+    background-image: repeating-linear-gradient(135deg, var(--pending-stripe) 0 6px, transparent 6px 12px);
+    border-style:dashed;
+    border-color:rgba(255,255,255,0.6);
+  }
+  .reservation.st-pendiente::after{
+    content:"pendiente";
+    position:absolute;
+    right:5px; bottom:3px;
+    font-size:9px;
+    font-weight:700;
+    letter-spacing:.02em;
+    opacity:.85;
+  }
+
+  /* ---------- Sidebar ---------- */
+  .side-stack{ display:flex; flex-direction:column; gap:16px; }
+  .pending-list{ list-style:none; margin:0; padding:6px; max-height:420px; overflow-y:auto;}
+  .pending-list li{
+    border:1px solid var(--line);
+    border-radius:var(--radius-sm);
+    padding:9px 10px;
+    margin:6px;
+    background:var(--surface-soft);
+  }
+  .pending-list .pl-top{
+    display:flex; justify-content:space-between; align-items:baseline; gap:8px;
+  }
+  .pending-list .pl-name{ font-weight:700; font-size:13.5px; }
+  .pending-list .pl-when{ font-size:11.5px; color:var(--ink-soft); white-space:nowrap; }
+  .pending-list .pl-court{ font-size:12px; color:var(--ink-soft); margin-top:2px; }
+  .pending-list .pl-actions{ display:flex; gap:6px; margin-top:8px; }
+  .pending-list .pl-actions button{
+    flex:1;
+    border:none;
+    border-radius:var(--radius-sm);
+    padding:6px 0;
+    font-size:12px;
+    font-weight:600;
+    cursor:pointer;
+    font-family:var(--font-body);
+  }
+  .btn-confirm{ background:var(--accent); color:var(--accent-ink); }
+  .btn-reject{ background:var(--danger-soft); color:var(--danger); }
+  .empty-note{ padding:18px 16px; font-size:13px; color:var(--ink-soft); }
+
+  .legend{ padding:10px 14px 14px; display:flex; flex-direction:column; gap:8px; }
+  .legend .lg-row{ display:flex; align-items:center; gap:9px; font-size:12.5px; color:var(--ink-soft); }
+  .legend .swatch{ width:14px; height:14px; border-radius:4px; flex-shrink:0; }
+  .legend .swatch.pending{
+    background:var(--surface-soft);
+    background-image: repeating-linear-gradient(135deg, var(--line-strong) 0 3px, transparent 3px 6px);
+    border:1px dashed var(--line-strong);
+  }
+
+  /* ---------- Modal ---------- */
+  .modal-backdrop{
+    position:fixed; inset:0;
+    background:rgba(20,26,20,0.45);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    padding:16px;
+    z-index:50;
+  }
+  .modal-backdrop.open{ display:flex; }
+  .modal{
+    background:var(--surface);
+    border-radius:14px;
+    width:100%;
+    max-width:400px;
+    max-height:92vh;
+    overflow-y:auto;
+    box-shadow:0 20px 60px rgba(0,0,0,0.3);
+  }
+  .modal-head{
+    padding:16px 18px 10px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+  }
+  .modal-head h3{
+    font-family:var(--font-display);
+    font-size:17px;
+    margin:0;
+  }
+  .modal-head button{
+    background:none; border:none; font-size:18px; cursor:pointer; color:var(--ink-soft);
+    width:28px; height:28px;
+  }
+  .modal-body{ padding:2px 18px 18px; display:flex; flex-direction:column; gap:12px; }
+  .field{ display:flex; flex-direction:column; gap:5px; }
+  .field label{ font-size:12px; font-weight:600; color:var(--ink-soft); }
+  .field-row{ display:flex; gap:10px; }
+  .field-row .field{ flex:1; }
+  input[type=text], input[type=date], select, textarea{
+    font-family:var(--font-body);
+    font-size:14px;
+    padding:9px 10px;
+    border-radius:var(--radius-sm);
+    border:1px solid var(--line-strong);
+    background:var(--bg);
+    color:var(--ink);
+    width:100%;
+  }
+  textarea{ resize:vertical; min-height:52px; }
+  input:focus, select:focus, textarea:focus, button:focus-visible{
+    outline:2px solid var(--accent);
+    outline-offset:1px;
+  }
+  .modal-actions{ display:flex; gap:8px; margin-top:6px; flex-wrap:wrap; }
+  .modal-actions button{
+    border:none; border-radius:999px; padding:10px 16px; font-size:13.5px; font-weight:600;
+    cursor:pointer; font-family:var(--font-body);
+  }
+  .btn-primary{ background:var(--accent); color:var(--accent-ink); flex:1; }
+  .btn-ghost{ background:var(--surface-soft); color:var(--ink); }
+  .btn-danger{ background:var(--danger-soft); color:var(--danger); }
+  .conflict-warning{
+    font-size:12px;
+    color:var(--danger);
+    background:var(--danger-soft);
+    border-radius:var(--radius-sm);
+    padding:8px 10px;
+    display:none;
+  }
+  .conflict-warning.show{ display:block; }
+  .status-banner{
+    font-size:12px;
+    padding:10px 16px;
+    background:var(--danger-soft);
+    color:var(--danger);
+    display:none;
+  }
+  .status-banner.show{ display:block; }
+  footer.hint{
+    text-align:center;
+    color:var(--ink-soft);
+    font-size:12px;
+    margin-top:22px;
+  }
+  .toast{
+    position:fixed;
+    left:50%;
+    bottom:24px;
+    transform:translateX(-50%) translateY(8px);
+    background:#20241C;
+    color:#F2F1E8;
+    padding:11px 20px;
+    border-radius:999px;
+    font-size:13px;
+    font-family:var(--font-body);
+    box-shadow:0 10px 30px rgba(0,0,0,0.25);
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .2s ease, transform .2s ease;
+    z-index:90;
+    max-width:88vw;
+    text-align:center;
+  }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+  .toast.toast-error{ background:#BA3B2E; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="top">
+    <div class="brand">
+      <div class="mark"><span class="dot"></span>Delta Tennis (YMCA)</div>
+      <div class="sub">Panel de turnos — 8 canchas · 08:00 a 21:00</div>
+      <button class="ro-badge" id="authBtn">🔒 Iniciar sesión</button>
+    </div>
+    <div class="date-nav">
+      <button id="prevDay" title="Día anterior">‹</button>
+      <button class="today-btn" id="todayBtn">Hoy</button>
+      <span class="cur-date" id="curDateLabel">—</span>
+      <button id="nextDay" title="Día siguiente">›</button>
+      <input type="date" id="datePicker">
+      <button id="calBtn" title="Elegir fecha">📅</button>
+    </div>
+  </header>
+
+  <div id="dbBanner" class="status-banner">No se pudo cargar la agenda. Recargá la página.</div>
+
+  <div class="summary" id="summaryRow"></div>
+
+  <div class="layout">
+    <div class="panel">
+      <h2>Grilla del día <span class="count" id="occCount">—</span></h2>
+      <div class="schedule-flex">
+        <div class="time-col" id="timeCol"></div>
+        <div class="courts-scroll" id="scheduleWrap">
+          <div class="courts-grid" id="scheduleGrid"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="side-stack">
+      <div class="panel">
+        <h2>Pendientes de aprobación <span class="count" id="pendingCount">0</span></h2>
+        <ul class="pending-list" id="pendingList"></ul>
+      </div>
+      <div class="panel">
+        <h2>Referencias</h2>
+        <div class="legend">
+          <div class="lg-row"><span class="swatch" style="background:var(--profesor)"></span>Profesor / clase</div>
+          <div class="lg-row"><span class="swatch" style="background:var(--escuela)"></span>Escuela</div>
+          <div class="lg-row"><span class="swatch" style="background:var(--alquiler)"></span>Alquiler</div>
+          <div class="lg-row"><span class="swatch" style="background:var(--mantenimiento)"></span>Mantenimiento / bloqueada</div>
+          <div class="lg-row"><span class="swatch" style="background:var(--daom)"></span>DAOM</div>
+          <div class="lg-row"><span class="swatch" style="background:var(--marianistas)"></span>Marianistas</div>
+          <div class="lg-row"><span class="swatch pending"></span>Pendiente de aprobación</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="hint">Tocá un casillero vacío para cargar una reserva. Tocá una reserva para editarla, confirmarla o eliminarla.</footer>
+</div>
+
+<!-- Modal -->
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="modalTitle">Nueva reserva</h3>
+      <button id="modalClose" aria-label="Cerrar">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field-row">
+        <div class="field">
+          <label for="fCourt">Cancha</label>
+          <select id="fCourt"></select>
+        </div>
+        <div class="field">
+          <label for="fDate">Fecha</label>
+          <input type="date" id="fDate">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="fStart">Hora de inicio</label>
+          <select id="fStart"></select>
+        </div>
+        <div class="field">
+          <label for="fDuration">Duración</label>
+          <select id="fDuration">
+            <option value="1">30 min</option>
+            <option value="2" selected>1 hora</option>
+            <option value="3">1 hora 30</option>
+            <option value="4">2 horas</option>
+            <option value="6">3 horas</option>
+            <option value="8">4 horas</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label for="fName" id="fNameLabel">Nombre (opcional)</label>
+        <select id="fNameSelect" style="display:none;"></select>
+        <input type="text" id="fName" placeholder="Ej: Gastón, Escuela, clase particular...">
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="fType">Tipo</label>
+          <select id="fType">
+            <option value="profesor">Profesor / clase</option>
+            <option value="escuela">Escuela</option>
+            <option value="alquiler">Alquiler</option>
+            <option value="mantenimiento">Mantenimiento / bloqueada</option>
+            <option value="daom">DAOM</option>
+            <option value="marianistas">Marianistas</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="fStatus">Estado</label>
+          <select id="fStatus">
+            <option value="pendiente">Pendiente</option>
+            <option value="confirmada">Confirmada</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label for="fNotes">Notas (opcional)</label>
+        <textarea id="fNotes" placeholder="Teléfono, aclaraciones..."></textarea>
+      </div>
+      <div class="field" id="repeatField">
+        <label style="display:flex; align-items:center; gap:8px; font-weight:500; color:var(--ink); cursor:pointer;">
+          <input type="checkbox" id="fRepeatWeek" style="width:auto;">
+          Repetir el mismo día y horario la semana que viene
+        </label>
+      </div>
+      <div class="conflict-warning" id="conflictWarning">Ese horario se superpone con otra reserva en esta cancha.</div>
+      <div class="modal-actions">
+        <button class="btn-primary" id="btnSave">Guardar</button>
+        <button class="btn-danger" id="btnDelete" style="display:none;">Eliminar</button>
+        <button class="btn-ghost" id="btnCancelModal">Cancelar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm dialog (replaces native confirm(), which browsers can silently block here) -->
+<div class="modal-backdrop" id="confirmBackdrop">
+  <div class="modal" style="max-width:340px;">
+    <div class="modal-body" style="padding-top:20px;">
+      <p id="confirmMessage" style="margin:0 0 16px;font-size:14px;line-height:1.45;"></p>
+      <div class="modal-actions">
+        <button class="btn-danger" id="confirmYes" style="flex:1;">Sí, confirmar</button>
+        <button class="btn-ghost" id="confirmNo" style="flex:1;">Cancelar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Login modal -->
+<div class="modal-backdrop auth-modal" id="authBackdrop">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>Iniciar sesión</h3>
+      <button id="authClose" aria-label="Cerrar">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label for="authEmail">Email</label>
+        <input type="text" id="authEmail" autocomplete="username" placeholder="tu@mail.com">
+      </div>
+      <div class="field">
+        <label for="authPassword">Contraseña</label>
+        <input type="password" id="authPassword" autocomplete="current-password">
+      </div>
+      <div class="auth-error" id="authError"></div>
+      <div class="modal-actions">
+        <button class="btn-primary" id="authSubmit">Entrar</button>
+        <button class="btn-ghost" id="authCancel">Cancelar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  var SLOTS_PER_DAY = 26; // 08:00 -> 20:30 bookable (last slot starts 20:00); closes 21:00
+  var START_HOUR = 8;
+  var COURTS = [1,2,3,4,5,6,7,8];
+  var TYPE_LABEL = {
+    profesor:"Profesor / clase", escuela:"Escuela",
+    alquiler:"Alquiler", mantenimiento:"Mantenimiento",
+    daom:"DAOM", marianistas:"Marianistas"
+  };
+  var PROFESSOR_NAMES = ["FACU","FRANCIS","HUGO","LAU","LAUCHA","LILI","LUCHO","MACA","NICO","OMAR","PATO","VALEN"];
+  var CUSTOM_NAME_VALUE = "__otro__";
+
+  function safeGetItem(key){
+    try{ return localStorage.getItem(key); }catch(e){ return null; }
+  }
+  function safeSetItem(key, value){
+    try{ localStorage.setItem(key, value); }catch(e){ /* storage unavailable, ignore */ }
+  }
+
+  // ---------- Supabase ----------
+  // The anon/publishable key below is meant to be public — it only lets
+  // this page talk to the project's API. What it can actually read or
+  // write is controlled server-side by Row Level Security policies
+  // (anyone can read; only a signed-in user can write).
+  var SUPABASE_URL = 'https://yfswlvfdcsqthdnfuxkw.supabase.co';
+  var SUPABASE_ANON_KEY = 'sb_publishable_AFW3bekV3p5pr1LALy4OMg_aznDStMG';
+  var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  var allReservations = [];   // every reservation, every date — the single source of truth
+  var saving = false;         // guards against double-submits while a save is in flight
+  var isReadOnly = true;      // becomes false once a signed-in session is confirmed
+  var currentSession = null;  // the Supabase auth session, if any
+
+  function genId(){
+    return 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2,8);
+  }
+
+  var state = {
+    selectedDate: safeGetItem('deltaTennisLastDate') || localISODate(new Date()),
+    reservations: [],       // reservations for selectedDate (derived from allReservations)
+    pending: [],            // all pending reservations, any date (derived from allReservations)
+    editingId: null
+  };
+
+  function recomputeDerived(){
+    state.reservations = allReservations.filter(function(r){ return r.date === state.selectedDate; });
+    state.pending = allReservations.filter(function(r){ return r.status === 'pendiente'; });
+  }
+
+  // ---------- date helpers ----------
+  function localISODate(d){
+    var y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0');
+    return y+'-'+m+'-'+day;
+  }
+  function parseISODate(s){
+    var parts = s.split('-').map(Number);
+    return new Date(parts[0], parts[1]-1, parts[2]);
+  }
+  function addDays(dateStr, n){
+    var d = parseISODate(dateStr);
+    d.setDate(d.getDate()+n);
+    return localISODate(d);
+  }
+  function formatHeaderDate(dateStr){
+    var d = parseISODate(dateStr);
+    var opts = { weekday:'short', day:'numeric', month:'short' };
+    return d.toLocaleDateString('es-AR', opts).replace('.', '');
+  }
+  function slotLabel(i){
+    var totalMin = i*30;
+    var h = START_HOUR + Math.floor(totalMin/60);
+    var m = totalMin % 60;
+    return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');
+  }
+  function durationLabel(slots){
+    var min = slots*30;
+    if(min < 60) return min+' min';
+    var h = min/60;
+    return (h % 1 === 0 ? h : h.toFixed(1))+' h';
+  }
+
+  // ---------- DOM refs ----------
+  var el = {
+    curDateLabel: document.getElementById('curDateLabel'),
+    prevDay: document.getElementById('prevDay'),
+    nextDay: document.getElementById('nextDay'),
+    todayBtn: document.getElementById('todayBtn'),
+    calBtn: document.getElementById('calBtn'),
+    datePicker: document.getElementById('datePicker'),
+    scheduleGrid: document.getElementById('scheduleGrid'),
+    scheduleWrap: document.getElementById('scheduleWrap'),
+    timeCol: document.getElementById('timeCol'),
+    occCount: document.getElementById('occCount'),
+    summaryRow: document.getElementById('summaryRow'),
+    pendingList: document.getElementById('pendingList'),
+    pendingCount: document.getElementById('pendingCount'),
+    dbBanner: document.getElementById('dbBanner'),
+    modalBackdrop: document.getElementById('modalBackdrop'),
+    modalTitle: document.getElementById('modalTitle'),
+    modalClose: document.getElementById('modalClose'),
+    btnCancelModal: document.getElementById('btnCancelModal'),
+    btnSave: document.getElementById('btnSave'),
+    btnDelete: document.getElementById('btnDelete'),
+    conflictWarning: document.getElementById('conflictWarning'),
+    fCourt: document.getElementById('fCourt'),
+    fDate: document.getElementById('fDate'),
+    fStart: document.getElementById('fStart'),
+    fDuration: document.getElementById('fDuration'),
+    fName: document.getElementById('fName'),
+    fNameSelect: document.getElementById('fNameSelect'),
+    fType: document.getElementById('fType'),
+    fStatus: document.getElementById('fStatus'),
+    fNotes: document.getElementById('fNotes'),
+    fRepeatWeek: document.getElementById('fRepeatWeek'),
+    repeatField: document.getElementById('repeatField'),
+    confirmBackdrop: document.getElementById('confirmBackdrop'),
+    confirmMessage: document.getElementById('confirmMessage'),
+    confirmYes: document.getElementById('confirmYes'),
+    confirmNo: document.getElementById('confirmNo'),
+    toast: document.getElementById('toast'),
+    authBtn: document.getElementById('authBtn'),
+    authBackdrop: document.getElementById('authBackdrop'),
+    authClose: document.getElementById('authClose'),
+    authEmail: document.getElementById('authEmail'),
+    authPassword: document.getElementById('authPassword'),
+    authError: document.getElementById('authError'),
+    authSubmit: document.getElementById('authSubmit'),
+    authCancel: document.getElementById('authCancel')
+  };
+
+  function applyAuthState(session){
+    currentSession = session || null;
+    isReadOnly = !currentSession;
+    if(currentSession){
+      el.authBtn.textContent = '✅ ' + currentSession.user.email + ' · Salir';
+      el.authBtn.classList.add('is-editor');
+    } else {
+      el.authBtn.textContent = '🔒 Iniciar sesión';
+      el.authBtn.classList.remove('is-editor');
+    }
+    renderGrid();
+    renderPendingList();
+  }
+
+  function openAuthModal(){
+    el.authEmail.value = '';
+    el.authPassword.value = '';
+    el.authError.classList.remove('show');
+    el.authBackdrop.classList.add('open');
+    setTimeout(function(){ el.authEmail.focus(); }, 30);
+  }
+  function closeAuthModal(){ el.authBackdrop.classList.remove('open'); }
+  el.authClose.addEventListener('click', closeAuthModal);
+  el.authCancel.addEventListener('click', closeAuthModal);
+  el.authBackdrop.addEventListener('click', function(e){ if(e.target === el.authBackdrop) closeAuthModal(); });
+
+  el.authBtn.addEventListener('click', function(){
+    if(currentSession){
+      confirmDialog('¿Cerrar sesión de ' + currentSession.user.email + '?').then(function(ok){
+        if(ok) sb.auth.signOut();
+      });
+    } else {
+      openAuthModal();
+    }
+  });
+
+  el.authSubmit.addEventListener('click', function(){
+    var email = el.authEmail.value.trim();
+    var password = el.authPassword.value;
+    if(!email || !password){
+      el.authError.textContent = 'Completá email y contraseña.';
+      el.authError.classList.add('show');
+      return;
+    }
+    el.authSubmit.disabled = true;
+    el.authSubmit.textContent = 'Entrando…';
+    sb.auth.signInWithPassword({ email: email, password: password }).then(function(res){
+      el.authSubmit.disabled = false;
+      el.authSubmit.textContent = 'Entrar';
+      if(res.error){
+        el.authError.textContent = 'No se pudo entrar: revisá el email y la contraseña.';
+        el.authError.classList.add('show');
+        return;
+      }
+      closeAuthModal();
+      showToast('Sesión iniciada. Ya podés editar.');
+    });
+  });
+
+  sb.auth.onAuthStateChange(function(event, session){
+    applyAuthState(session);
+  });
+
+  // populate court + start-time selects once
+  COURTS.forEach(function(c){
+    var o = document.createElement('option');
+    o.value = c; o.textContent = 'Cancha '+c;
+    el.fCourt.appendChild(o);
+  });
+  for(var i=0;i<SLOTS_PER_DAY;i++){
+    var o = document.createElement('option');
+    o.value = i; o.textContent = slotLabel(i);
+    el.fStart.appendChild(o);
+  }
+  (function(){
+    var blank = document.createElement('option');
+    blank.value = ''; blank.textContent = '-- Elegir profesor --';
+    el.fNameSelect.appendChild(blank);
+    PROFESSOR_NAMES.forEach(function(n){
+      var opt = document.createElement('option');
+      opt.value = n; opt.textContent = n;
+      el.fNameSelect.appendChild(opt);
+    });
+    var other = document.createElement('option');
+    other.value = CUSTOM_NAME_VALUE; other.textContent = 'Otro (escribir)';
+    el.fNameSelect.appendChild(other);
+  })();
+
+  function updateNameFieldMode(){
+    var isProfesor = (el.fType.value === 'profesor');
+    if(isProfesor){
+      el.fNameSelect.style.display = '';
+      var showText = (el.fNameSelect.value === CUSTOM_NAME_VALUE);
+      el.fName.style.display = showText ? '' : 'none';
+    } else {
+      el.fNameSelect.style.display = 'none';
+      el.fName.style.display = '';
+    }
+  }
+  el.fType.addEventListener('change', updateNameFieldMode);
+  el.fNameSelect.addEventListener('change', updateNameFieldMode);
+
+  function rebuildDurationOptions(preferredSlots){
+    var start = parseInt(el.fStart.value,10);
+    if(isNaN(start)) start = 0;
+    var maxSlots = Math.max(1, SLOTS_PER_DAY - start);
+    el.fDuration.innerHTML = '';
+    for(var slots=1; slots<=maxSlots; slots++){
+      var opt = document.createElement('option');
+      opt.value = slots;
+      opt.textContent = 'Hasta las ' + slotLabel(start+slots);
+      el.fDuration.appendChild(opt);
+    }
+    var target = (preferredSlots && preferredSlots<=maxSlots) ? preferredSlots : Math.min(2, maxSlots);
+    el.fDuration.value = target;
+  }
+  el.fStart.addEventListener('change', function(){ rebuildDurationOptions(); });
+
+  function renderDateNav(){
+    el.curDateLabel.textContent = formatHeaderDate(state.selectedDate);
+    el.datePicker.value = state.selectedDate;
+    safeSetItem('deltaTennisLastDate', state.selectedDate);
+    var isToday = (state.selectedDate === localISODate(new Date()));
+    el.todayBtn.classList.toggle('is-active', isToday);
+  }
+
+  // ---------- schedule grid rendering ----------
+  function renderGrid(){
+    var grid = el.scheduleGrid;
+    grid.innerHTML = '';
+    el.timeCol.innerHTML = '';
+
+    // fixed time column: blank corner + 24 time labels, never scrolls
+    var corner = document.createElement('div');
+    corner.className = 'cell-head corner';
+    el.timeCol.appendChild(corner);
+    for(var i=0;i<SLOTS_PER_DAY;i++){
+      var isHour = (i % 2 === 0);
+      var tl = document.createElement('div');
+      tl.className = 'time-label' + (isHour ? ' hour' : ' hour-end');
+      tl.textContent = slotLabel(i);
+      el.timeCol.appendChild(tl);
+    }
+
+
+    // court headers, in the horizontally-scrolling grid
+    COURTS.forEach(function(c){
+      var h = document.createElement('div');
+      h.className = 'cell-head';
+      h.style.gridColumn = c; h.style.gridRow = '1';
+      h.textContent = 'Cancha '+c;
+      grid.appendChild(h);
+    });
+
+    // occupancy map: occ[court][slot] = reservation object or null
+    var occ = {};
+    COURTS.forEach(function(c){ occ[c] = new Array(SLOTS_PER_DAY).fill(null); });
+    state.reservations.forEach(function(r){
+      for(var s = r.start; s < r.start + r.duration && s < SLOTS_PER_DAY; s++){
+        if(occ[r.court]) occ[r.court][s] = r;
+      }
+    });
+
+    var occupiedSlots = 0;
+    COURTS.forEach(function(c){
+      for(var s=0; s<SLOTS_PER_DAY; s++){
+        var res = occ[c][s];
+        var isHourLine = (s % 2 === 1);
+        if(!res){
+          var empty = document.createElement('div');
+          empty.className = 'slot-empty' + (isHourLine ? ' hour-line' : '');
+          empty.style.gridColumn = c; empty.style.gridRow = (s+2);
+          empty.addEventListener('click', (function(court, slot){
+            return function(){ openModalNew(court, slot); };
+          })(c, s));
+          grid.appendChild(empty);
+        } else if(res.start === s){
+          occupiedSlots++;
+          var block = document.createElement('div');
+          block.className = 'reservation type-'+res.type+' st-'+res.status;
+          block.style.gridColumn = c;
+          block.style.gridRow = (s+2)+' / span '+res.duration;
+          var endLabel = slotLabel(Math.min(res.start+res.duration, SLOTS_PER_DAY));
+          block.innerHTML = '<span class="name"></span><span class="meta"></span>';
+          block.querySelector('.name').textContent = res.name || TYPE_LABEL[res.type] || 'Reserva';
+          block.querySelector('.meta').textContent = slotLabel(res.start)+'–'+endLabel+' · '+TYPE_LABEL[res.type];
+          block.addEventListener('click', (function(reservation){
+            return function(){ openModalEdit(reservation); };
+          })(res));
+          grid.appendChild(block);
+        } else {
+          occupiedSlots++;
+        }
+      }
+    });
+
+    el.occCount.textContent = occupiedSlots + '/' + (COURTS.length*SLOTS_PER_DAY) + ' turnos ocupados';
+    renderSummary(occupiedSlots);
+  }
+
+  function renderSummary(occupiedSlots){
+    var confirmed = state.reservations.filter(function(r){ return r.status==='confirmada'; }).length;
+    var pendingToday = state.reservations.filter(function(r){ return r.status==='pendiente'; }).length;
+    var freeCourtsNow = COURTS.length*SLOTS_PER_DAY - occupiedSlots;
+    el.summaryRow.innerHTML =
+      '<div class="pill">Confirmadas hoy <b>'+confirmed+'</b></div>'+
+      '<div class="pill'+(pendingToday>0?' warn':'')+'">Pendientes hoy <b>'+pendingToday+'</b></div>'+
+      '<div class="pill">Turnos libres <b>'+freeCourtsNow+'</b></div>';
+  }
+
+  // ---------- pending sidebar ----------
+  function renderPendingList(){
+    el.pendingCount.textContent = state.pending.length;
+    if(state.pending.length === 0){
+      el.pendingList.innerHTML = '<div class="empty-note">No hay solicitudes esperando aprobación.</div>';
+      return;
+    }
+    var sorted = state.pending.slice().sort(function(a,b){
+      if(a.date !== b.date) return a.date < b.date ? -1 : 1;
+      return a.start - b.start;
+    });
+    el.pendingList.innerHTML = '';
+    sorted.forEach(function(r){
+      var li = document.createElement('li');
+      var endLabel = slotLabel(Math.min(r.start+r.duration, SLOTS_PER_DAY));
+      var dateLabel = (r.date === state.selectedDate) ? 'Hoy' : formatHeaderDate(r.date);
+      var actionsHtml = isReadOnly ? '' :
+        '<div class="pl-actions"><button class="btn-confirm">Confirmar</button><button class="btn-reject">Rechazar</button></div>';
+      li.innerHTML =
+        '<div class="pl-top"><span class="pl-name"></span><span class="pl-when">'+dateLabel+' · '+slotLabel(r.start)+'–'+endLabel+'</span></div>'+
+        '<div class="pl-court">Cancha '+r.court+' · '+TYPE_LABEL[r.type]+'</div>'+
+        actionsHtml;
+      li.querySelector('.pl-name').textContent = r.name || TYPE_LABEL[r.type] || 'Reserva';
+      if(!isReadOnly){
+        li.querySelector('.btn-confirm').addEventListener('click', function(){ quickConfirm(r.id); });
+        li.querySelector('.btn-reject').addEventListener('click', function(){ quickReject(r.id, r.name); });
+      }
+      li.addEventListener('click', function(evt){
+        if(evt.target.tagName === 'BUTTON') return;
+        openModalEdit(r);
+      });
+      el.pendingList.appendChild(li);
+    });
+  }
+
+  // ---------- modal ----------
+  function openModalNew(court, startSlot){
+    if(isReadOnly){
+      showToast('Iniciá sesión para cargar reservas.', true);
+      openAuthModal();
+      return;
+    }
+    state.editingId = null;
+    el.modalTitle.textContent = 'Nueva reserva';
+    el.fCourt.value = court;
+    el.fDate.value = state.selectedDate;
+    el.fStart.value = startSlot;
+    rebuildDurationOptions(2);
+    el.fName.value = '';
+    el.fNameSelect.value = '';
+    el.fType.value = 'profesor';
+    el.fStatus.value = 'confirmada';
+    el.fNotes.value = '';
+    el.fRepeatWeek.checked = false;
+    el.repeatField.style.display = '';
+    el.btnDelete.style.display = 'none';
+    el.conflictWarning.classList.remove('show');
+    updateNameFieldMode();
+    el.modalBackdrop.classList.add('open');
+    setTimeout(function(){
+      (el.fType.value === 'profesor' ? el.fNameSelect : el.fName).focus();
+    }, 30);
+  }
+  function openModalEdit(res){
+    state.editingId = res.id;
+    el.modalTitle.textContent = 'Editar reserva';
+    el.fCourt.value = res.court;
+    el.fDate.value = res.date;
+    el.fStart.value = res.start;
+    rebuildDurationOptions(res.duration);
+    el.fType.value = res.type;
+    var name = res.name || '';
+    if(res.type === 'profesor' && PROFESSOR_NAMES.indexOf(name) !== -1){
+      el.fNameSelect.value = name;
+      el.fName.value = '';
+    } else if(res.type === 'profesor' && name){
+      el.fNameSelect.value = CUSTOM_NAME_VALUE;
+      el.fName.value = name;
+    } else {
+      el.fNameSelect.value = '';
+      el.fName.value = name;
+    }
+    el.fStatus.value = res.status;
+    el.fNotes.value = res.notes || '';
+    el.repeatField.style.display = 'none';
+    el.btnDelete.style.display = '';
+    el.conflictWarning.classList.remove('show');
+    updateNameFieldMode();
+    if(isReadOnly){
+      el.btnSave.style.display = 'none';
+      el.btnDelete.style.display = 'none';
+      el.conflictWarning.textContent = 'Estás viendo en modo solo lectura: no podés modificar esta reserva.';
+      el.conflictWarning.classList.add('show');
+    } else {
+      el.btnSave.style.display = '';
+    }
+    el.modalBackdrop.classList.add('open');
+  }
+  function closeModal(){
+    el.modalBackdrop.classList.remove('open');
+    state.editingId = null;
+  }
+  el.modalClose.addEventListener('click', closeModal);
+  el.btnCancelModal.addEventListener('click', closeModal);
+  el.modalBackdrop.addEventListener('click', function(e){ if(e.target === el.modalBackdrop) closeModal(); });
+
+  function hasConflict(date, court, start, duration, excludeId){
+    return allReservations.some(function(r){
+      if(r.id === excludeId) return false;
+      if(r.date !== date) return false;
+      if(r.court !== court) return false;
+      var end = start + duration;
+      var rEnd = r.start + r.duration;
+      return start < rEnd && r.start < end;
+    });
+  }
+
+  function currentNameValue(){
+    if(el.fType.value === 'profesor'){
+      if(el.fNameSelect.value === CUSTOM_NAME_VALUE) return el.fName.value.trim();
+      return el.fNameSelect.value;
+    }
+    return el.fName.value.trim();
+  }
+
+  el.btnSave.addEventListener('click', function(){
+    if(saving) return;
+    if(isReadOnly){ showToast('Iniciá sesión para guardar.', true); openAuthModal(); return; }
+    var name = currentNameValue();
+    var payload = {
+      date: el.fDate.value,
+      court: parseInt(el.fCourt.value,10),
+      start: parseInt(el.fStart.value,10),
+      duration: parseInt(el.fDuration.value,10),
+      name: name,
+      type: el.fType.value,
+      status: el.fStatus.value,
+      notes: el.fNotes.value.trim()
+    };
+    if(payload.start + payload.duration > SLOTS_PER_DAY){
+      el.conflictWarning.textContent = 'El turno se pasa del horario de cierre (21:00).';
+      el.conflictWarning.classList.add('show');
+      return;
+    }
+    if(hasConflict(payload.date, payload.court, payload.start, payload.duration, state.editingId)){
+      el.conflictWarning.textContent = 'Ese horario se superpone con otra reserva en esta cancha.';
+      el.conflictWarning.classList.add('show');
+      return;
+    }
+
+    var wantsRepeat = !state.editingId && el.fRepeatWeek.checked;
+    var repeatPayload = null;
+    var repeatSkipReason = null;
+    if(wantsRepeat){
+      var repeatDate = addDays(payload.date, 7);
+      if(hasConflict(repeatDate, payload.court, payload.start, payload.duration, null)){
+        repeatSkipReason = 'la semana que viene ya hay algo reservado en ese horario';
+      } else {
+        repeatPayload = Object.assign({}, payload, {
+          id: genId(),
+          date: repeatDate,
+          created_at: new Date().toISOString()
+        });
+      }
+    }
+
+    setSaving(true);
+    var req;
+    if(state.editingId){
+      payload.updated_at = new Date().toISOString();
+      req = sb.from('reservations').update(payload).eq('id', state.editingId);
+    } else {
+      payload.id = genId();
+      payload.created_at = new Date().toISOString();
+      req = sb.from('reservations').insert(payload);
+    }
+    req.then(function(res){
+      if(res.error){
+        setSaving(false);
+        showSaveError(res.error);
+        showToast(errorMessage(res.error), true);
+        return;
+      }
+      if(repeatPayload){
+        sb.from('reservations').insert(repeatPayload).then(function(res2){
+          setSaving(false);
+          closeModal();
+          if(res2.error){
+            showToast('Se guardó esta semana, pero no se pudo repetir la próxima (' + errorMessage(res2.error) + ').', true);
+          } else {
+            showToast('Guardado esta semana y la próxima.');
+          }
+          loadData();
+        });
+        return;
+      }
+      setSaving(false);
+      closeModal();
+      showToast(repeatSkipReason ? ('Guardado. No se repitió la próxima semana: ' + repeatSkipReason + '.') : 'Guardado.');
+      loadData();
+    });
+  });
+
+  function setSaving(isSaving){
+    saving = isSaving;
+    el.btnSave.disabled = isSaving;
+    el.btnSave.textContent = isSaving ? 'Guardando…' : 'Guardar';
+  }
+
+  function errorMessage(err){
+    if(!err) return 'No se pudo guardar. Probá de nuevo.';
+    if(err.code === '42501' || err.code === 'PGRST301' || /permission|policy|jwt/i.test(err.message || '')){
+      return 'No tenés permiso para guardar: iniciá sesión.';
+    }
+    return 'No se pudo guardar (' + (err.message || err.code || 'error') + '). Probá de nuevo.';
+  }
+  function showSaveError(err){
+    el.conflictWarning.textContent = errorMessage(err);
+    el.conflictWarning.classList.add('show');
+  }
+
+  function showToast(message, isError){
+    el.toast.textContent = message;
+    el.toast.classList.toggle('toast-error', !!isError);
+    el.toast.classList.add('show');
+    clearTimeout(el.toast._hideTimer);
+    el.toast._hideTimer = setTimeout(function(){ el.toast.classList.remove('show'); }, 3200);
+  }
+
+  // Custom confirmation dialog: native confirm()/alert() get silently
+  // blocked inside a sandboxed artifact iframe, so we render our own.
+  function confirmDialog(message){
+    return new Promise(function(resolve){
+      el.confirmMessage.textContent = message;
+      el.confirmBackdrop.classList.add('open');
+      function cleanup(result){
+        el.confirmBackdrop.classList.remove('open');
+        el.confirmYes.removeEventListener('click', onYes);
+        el.confirmNo.removeEventListener('click', onNo);
+        el.confirmBackdrop.removeEventListener('click', onBackdrop);
+        resolve(result);
+      }
+      function onYes(){ cleanup(true); }
+      function onNo(){ cleanup(false); }
+      function onBackdrop(e){ if(e.target === el.confirmBackdrop) cleanup(false); }
+      el.confirmYes.addEventListener('click', onYes);
+      el.confirmNo.addEventListener('click', onNo);
+      el.confirmBackdrop.addEventListener('click', onBackdrop);
+    });
+  }
+
+  el.btnDelete.addEventListener('click', function(){
+    if(saving || !state.editingId) return;
+    var idToDelete = state.editingId;
+    confirmDialog('¿Eliminar esta reserva? Esta acción no se puede deshacer.').then(function(ok){
+      if(!ok) return;
+      setSaving(true);
+      sb.from('reservations').delete().eq('id', idToDelete).then(function(res){
+        setSaving(false);
+        if(res.error){ showSaveError(res.error); showToast(errorMessage(res.error), true); return; }
+        closeModal();
+        showToast('Reserva eliminada.');
+        loadData();
+      });
+    });
+  });
+
+  function quickConfirm(id){
+    if(saving) return;
+    sb.from('reservations').update({status:'confirmada'}).eq('id', id).then(function(res){
+      if(res.error){ showToast(errorMessage(res.error), true); return; }
+      showToast('Reserva confirmada.');
+      loadData();
+    });
+  }
+  function quickReject(id, name){
+    if(saving) return;
+    var label = name || 'esta solicitud';
+    confirmDialog('¿Rechazar '+label+'? El turno queda libre.').then(function(ok){
+      if(!ok) return;
+      sb.from('reservations').delete().eq('id', id).then(function(res){
+        if(res.error){ showToast(errorMessage(res.error), true); return; }
+        showToast('Solicitud rechazada.');
+        loadData();
+      });
+    });
+  }
+
+  // ---------- date navigation wiring ----------
+  function setDate(newDate){
+    state.selectedDate = newDate;
+    renderDateNav();
+    recomputeDerived();
+    renderGrid();
+  }
+  el.prevDay.addEventListener('click', function(){ setDate(addDays(state.selectedDate, -1)); });
+  el.nextDay.addEventListener('click', function(){ setDate(addDays(state.selectedDate, 1)); });
+  el.todayBtn.addEventListener('click', function(){ setDate(localISODate(new Date())); });
+  el.calBtn.addEventListener('click', function(){ el.datePicker.showPicker ? el.datePicker.showPicker() : el.datePicker.click(); });
+  el.datePicker.addEventListener('change', function(){ if(el.datePicker.value) setDate(el.datePicker.value); });
+
+  // ---------- loading data from Supabase ----------
+  // Reading is public (RLS policy "public read"), so any visitor sees the
+  // agenda without signing in. Writing requires an authenticated session
+  // (RLS policy "authenticated write ..."), enforced server-side — the
+  // signed-in-state check in the UI is just for a smooth experience.
+  async function loadData(){
+    try{
+      var res = await sb.from('reservations').select('*');
+      if(res.error){
+        console.error('load error', res.error);
+        el.dbBanner.textContent = 'No se pudo cargar la agenda. Recargá la página.';
+        el.dbBanner.classList.add('show');
+        return;
+      }
+      el.dbBanner.classList.remove('show');
+      allReservations = res.data || [];
+      recomputeDerived();
+      renderGrid();
+      renderPendingList();
+    }catch(e){
+      console.error('load error', e);
+      el.dbBanner.textContent = 'No se pudo cargar la agenda. Recargá la página.';
+      el.dbBanner.classList.add('show');
+    }
+  }
+
+  async function init(){
+    renderDateNav();
+    await loadData();
+
+    var sessionRes = await sb.auth.getSession();
+    applyAuthState(sessionRes.data ? sessionRes.data.session : null);
+
+    // Live updates: when the editor (or anyone) changes the table,
+    // every open tab — including read-only viewers — refreshes on its own.
+    sb.channel('reservations-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'reservations' }, function(){
+        loadData();
+      })
+      .subscribe();
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
