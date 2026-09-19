@@ -681,11 +681,15 @@
 <div class="modal-backdrop" id="historyBackdrop">
   <div class="modal" style="max-width:560px;">
     <div class="modal-head">
-      <h3>Detalle de reservas</h3>
+      <h3>Detalle de reservas — <span id="historyDateLabel"></span></h3>
       <button id="historyClose" aria-label="Cerrar">✕</button>
     </div>
     <div class="modal-body">
-      <div id="historyList" style="max-height:60vh; overflow-y:auto; display:flex; flex-direction:column; gap:10px;"></div>
+      <div style="font-size:12px; font-weight:600; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.02em;">Reservas de este día</div>
+      <div id="historyReservations" style="display:flex; flex-direction:column; gap:10px;"></div>
+
+      <div style="font-size:12px; font-weight:600; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.02em; margin-top:8px;">Historial de cambios de este día</div>
+      <div id="historyList" style="max-height:40vh; overflow-y:auto; display:flex; flex-direction:column; gap:10px;"></div>
     </div>
   </div>
 </div>
@@ -830,6 +834,8 @@
     historyBackdrop: document.getElementById('historyBackdrop'),
     historyClose: document.getElementById('historyClose'),
     historyList: document.getElementById('historyList'),
+    historyDateLabel: document.getElementById('historyDateLabel'),
+    historyReservations: document.getElementById('historyReservations'),
     pendingCount: document.getElementById('pendingCount'),
     dbBanner: document.getElementById('dbBanner'),
     modalBackdrop: document.getElementById('modalBackdrop'),
@@ -999,7 +1005,18 @@
     }
     el.historyList.innerHTML = '';
     var actionLabel = { created:'🟢 Creada', updated:'✏️ Editada', deleted:'🗑️ Eliminada' };
+    var groupLabels = { 0: 'PROFESORES', 1: 'ALQUILERES', 2: 'OTROS' };
+    var lastGroup = null;
     entries.forEach(function(h){
+      var t = (h.new_data && h.new_data.type) || (h.old_data && h.old_data.type) || '';
+      var group = (t === 'profesor') ? 0 : (t === 'alquiler') ? 1 : 2;
+      if(group !== lastGroup){
+        var heading = document.createElement('div');
+        heading.style.cssText = 'font-size:11px; font-weight:700; color:var(--ink-soft); letter-spacing:.03em; margin-top:6px;';
+        heading.textContent = groupLabels[group];
+        el.historyList.appendChild(heading);
+        lastGroup = group;
+      }
       var row = document.createElement('div');
       row.style.cssText = 'border:1px solid var(--line); border-radius:8px; padding:10px 12px; font-size:13px;';
       var when = new Date(h.changed_at).toLocaleString('es-AR');
@@ -1023,17 +1040,97 @@
 
   el.historyBtn.addEventListener('click', function(){
     el.historyBackdrop.classList.add('open');
+    el.historyDateLabel.textContent = formatHeaderDate(state.selectedDate);
+    renderDayReservationsPayment(state.reservations);
     el.historyList.innerHTML = '<div class="empty-note">Cargando…</div>';
-    sb.from('reservation_history').select('*').order('changed_at', { ascending: false }).limit(300).then(function(res){
-      if(res.error){
-        el.historyList.innerHTML = '<div class="empty-note">No se pudo cargar el historial.</div>';
-        return;
-      }
-      renderHistoryList(res.data || []);
-    });
+    var d = state.selectedDate;
+    sb.from('reservation_history').select('*')
+      .or('new_data->>date.eq.' + d + ',old_data->>date.eq.' + d)
+      .order('changed_at', { ascending: false })
+      .limit(300)
+      .then(function(res){
+        if(res.error){
+          el.historyList.innerHTML = '<div class="empty-note">No se pudo cargar el historial.</div>';
+          return;
+        }
+        var entries = (res.data || []).filter(function(h){
+          var nd = h.new_data && h.new_data.date;
+          var od = h.old_data && h.old_data.date;
+          return nd === d || od === d;
+        });
+        function typeOf(h){ return (h.new_data && h.new_data.type) || (h.old_data && h.old_data.type) || ''; }
+        function categoryPriority(t){
+          if(t === 'profesor') return 0;
+          if(t === 'alquiler') return 1;
+          return 2;
+        }
+        entries.sort(function(a, b){
+          var pa = categoryPriority(typeOf(a));
+          var pb = categoryPriority(typeOf(b));
+          if(pa !== pb) return pa - pb;
+          return new Date(b.changed_at) - new Date(a.changed_at);
+        });
+        renderHistoryList(entries);
+      });
   });
   el.historyClose.addEventListener('click', function(){ el.historyBackdrop.classList.remove('open'); });
   el.historyBackdrop.addEventListener('click', function(e){ if(e.target === el.historyBackdrop) el.historyBackdrop.classList.remove('open'); });
+
+  // Editable "pagado / pendiente" + note, one row per reservation on the
+  // day currently being viewed. Saves straight to the reservations table.
+  function renderDayReservationsPayment(list){
+    if(!list || !list.length){
+      el.historyReservations.innerHTML = '<div class="empty-note">No hay reservas cargadas este día.</div>';
+      return;
+    }
+    el.historyReservations.innerHTML = '';
+    list.slice().sort(function(a,b){ return a.start - b.start; }).forEach(function(r){
+      var endLabel = slotLabel(Math.min(r.start+r.duration, SLOTS_PER_DAY));
+      var who = r.name || TYPE_LABEL[r.type] || r.type;
+      var row = document.createElement('div');
+      row.style.cssText = 'border:1px solid var(--line); border-radius:8px; padding:10px 12px; font-size:13px; display:flex; flex-direction:column; gap:8px;';
+      row.innerHTML =
+        '<div><b>' + who + '</b> · Cancha ' + r.court + ' · ' + slotLabel(r.start) + '–' + endLabel + ' · ' + (TYPE_LABEL[r.type] || r.type) + '</div>' +
+        '<div class="pay-toggle" style="display:flex; gap:6px;">' +
+          '<button type="button" class="pay-btn" data-status="pagado" style="flex:1; border:none; border-radius:6px; padding:6px 0; font-weight:600; cursor:pointer;">Pagado</button>' +
+          '<button type="button" class="pay-btn" data-status="pendiente" style="flex:1; border:none; border-radius:6px; padding:6px 0; font-weight:600; cursor:pointer;">Pendiente</button>' +
+        '</div>' +
+        '<input type="text" class="pay-note" placeholder="Nota (ej: pagó en efectivo, debe $2000...)">';
+
+      var payBtns = row.querySelectorAll('.pay-btn');
+      function refreshBtnStyles(){
+        payBtns.forEach(function(b){
+          var active = (r.payment_status || 'pendiente') === b.dataset.status;
+          var isPaid = b.dataset.status === 'pagado';
+          b.style.background = active ? (isPaid ? 'var(--accent)' : 'var(--danger-soft)') : 'var(--surface-soft)';
+          b.style.color = active ? (isPaid ? 'var(--accent-ink)' : 'var(--danger)') : 'var(--ink-soft)';
+        });
+      }
+      refreshBtnStyles();
+      payBtns.forEach(function(b){
+        b.addEventListener('click', function(){
+          var newStatus = b.dataset.status;
+          sb.from('reservations').update({ payment_status: newStatus }).eq('id', r.id).then(function(res){
+            if(res.error){ showToast('No se pudo guardar.', true); return; }
+            r.payment_status = newStatus;
+            refreshBtnStyles();
+            loadData();
+          });
+        });
+      });
+
+      var noteInput = row.querySelector('.pay-note');
+      noteInput.value = r.payment_note || '';
+      noteInput.addEventListener('change', function(){
+        sb.from('reservations').update({ payment_note: noteInput.value }).eq('id', r.id).then(function(res){
+          if(res.error){ showToast('No se pudo guardar la nota.', true); return; }
+          showToast('Nota guardada.');
+        });
+      });
+
+      el.historyReservations.appendChild(row);
+    });
+  }
 
   // populate court + start-time selects once
   COURTS.forEach(function(c){
