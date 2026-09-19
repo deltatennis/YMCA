@@ -231,6 +231,7 @@
   @media (max-width:880px){
     .layout{grid-template-columns:1fr;}
   }
+  .layout.single-col{ grid-template-columns:1fr; }
 
   .panel{
     background:var(--surface);
@@ -529,6 +530,7 @@
       <div class="mark"><span class="dot"></span>Delta Tennis (YMCA)</div>
       <div class="sub">Panel de turnos — 8 canchas · 08:00 a 21:00</div>
       <button class="ro-badge" id="authBtn">🔒 Iniciar sesión</button>
+      <button class="ro-badge" id="historyBtn" style="display:none; margin-top:6px;">📋 Detalle de reservas</button>
     </div>
     <div class="date-nav">
       <button id="prevDay" title="Día anterior">‹</button>
@@ -544,23 +546,27 @@
 
   <div class="summary" id="summaryRow"></div>
 
-  <div class="layout">
+  <div class="layout" id="layoutRoot">
     <div class="panel">
       <h2>Grilla del día <span class="count" id="occCount">—</span></h2>
-      <div class="schedule-flex">
+      <div class="schedule-flex" id="scheduleFlex">
         <div class="time-col" id="timeCol"></div>
         <div class="courts-scroll" id="scheduleWrap">
           <div class="courts-grid" id="scheduleGrid"></div>
         </div>
       </div>
+      <div class="empty-note" id="loginPrompt" style="display:none; text-align:center; padding:40px 16px;">
+        Iniciá sesión para ver la agenda.<br><br>
+        <button class="btn-primary" id="loginPromptBtn" style="border-radius:999px; padding:10px 20px;">Iniciar sesión</button>
+      </div>
     </div>
 
-    <div class="side-stack">
-      <div class="panel">
+    <div class="side-stack" id="sideStack">
+      <div class="panel" id="pendingPanel">
         <h2>Pendientes de aprobación <span class="count" id="pendingCount">0</span></h2>
         <ul class="pending-list" id="pendingList"></ul>
       </div>
-      <div class="panel">
+      <div class="panel" id="legendPanel">
         <h2>Referencias</h2>
         <div class="legend">
           <div class="lg-row"><span class="swatch" style="background:var(--profesor)"></span>Profesor / clase</div>
@@ -613,12 +619,12 @@
           </select>
         </div>
       </div>
-      <div class="field">
+      <div class="field" id="nameField">
         <label for="fName" id="fNameLabel">Nombre (opcional)</label>
         <select id="fNameSelect" style="display:none;"></select>
         <input type="text" id="fName" placeholder="Ej: Gastón, Escuela, clase particular...">
       </div>
-      <div class="field-row">
+      <div class="field-row" id="typeStatusRow">
         <div class="field">
           <label for="fType">Tipo</label>
           <select id="fType">
@@ -667,6 +673,19 @@
         <button class="btn-danger" id="confirmYes" style="flex:1;">Sí, confirmar</button>
         <button class="btn-ghost" id="confirmNo" style="flex:1;">Cancelar</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- History / audit log modal (admin only) -->
+<div class="modal-backdrop" id="historyBackdrop">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-head">
+      <h3>Detalle de reservas</h3>
+      <button id="historyClose" aria-label="Cerrar">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="historyList" style="max-height:60vh; overflow-y:auto; display:flex; flex-direction:column; gap:10px;"></div>
     </div>
   </div>
 </div>
@@ -733,6 +752,8 @@
   var saving = false;         // guards against double-submits while a save is in flight
   var isReadOnly = true;      // becomes false once a signed-in session is confirmed
   var currentSession = null;  // the Supabase auth session, if any
+  var currentRole = null;     // 'admin' | 'profesor' | 'viewer' | null
+  var currentProfName = null; // the teacher's own name, when role === 'profesor'
 
   function genId(){
     return 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2,8);
@@ -796,6 +817,19 @@
     occCount: document.getElementById('occCount'),
     summaryRow: document.getElementById('summaryRow'),
     pendingList: document.getElementById('pendingList'),
+    nameField: document.getElementById('nameField'),
+    typeStatusRow: document.getElementById('typeStatusRow'),
+    pendingPanel: document.getElementById('pendingPanel'),
+    legendPanel: document.getElementById('legendPanel'),
+    sideStack: document.getElementById('sideStack'),
+    layoutRoot: document.getElementById('layoutRoot'),
+    scheduleFlex: document.getElementById('scheduleFlex'),
+    loginPrompt: document.getElementById('loginPrompt'),
+    loginPromptBtn: document.getElementById('loginPromptBtn'),
+    historyBtn: document.getElementById('historyBtn'),
+    historyBackdrop: document.getElementById('historyBackdrop'),
+    historyClose: document.getElementById('historyClose'),
+    historyList: document.getElementById('historyList'),
     pendingCount: document.getElementById('pendingCount'),
     dbBanner: document.getElementById('dbBanner'),
     modalBackdrop: document.getElementById('modalBackdrop'),
@@ -833,16 +867,52 @@
 
   function applyAuthState(session){
     currentSession = session || null;
-    isReadOnly = !currentSession;
+    currentRole = null;
+    currentProfName = null;
+
     if(currentSession){
-      el.authBtn.textContent = '✅ ' + currentSession.user.email + ' · Salir';
+      var meta = currentSession.user.user_metadata || {};
+      currentRole = meta.role || 'admin'; // accounts created before roles existed default to admin
+      currentProfName = meta.profesor_name || null;
+      var label = currentRole === 'profesor' ? (currentProfName || currentSession.user.email) : currentSession.user.email;
+      el.authBtn.textContent = '✅ ' + label + ' · Salir';
       el.authBtn.classList.add('is-editor');
     } else {
       el.authBtn.textContent = '🔒 Iniciar sesión';
       el.authBtn.classList.remove('is-editor');
     }
+
+    // Only admin and profesor accounts can ever write; viewer accounts and
+    // anyone signed out are always read-only (or see nothing at all — see below).
+    isReadOnly = !currentSession || (currentRole !== 'admin' && currentRole !== 'profesor');
+
+    var isTeacherView = (currentRole !== 'admin'); // anyone but MACA gets the restricted side panels
+    el.summaryRow.style.display = isTeacherView ? 'none' : '';
+    el.pendingPanel.style.display = isTeacherView ? 'none' : '';
+    el.legendPanel.style.display = isTeacherView ? 'none' : '';
+    el.sideStack.style.display = isTeacherView ? 'none' : '';
+    el.layoutRoot.classList.toggle('single-col', isTeacherView);
+
+    // Nobody sees the grid at all without signing in — not even read-only.
+    var signedIn = !!currentSession;
+    el.scheduleFlex.style.display = signedIn ? '' : 'none';
+    el.loginPrompt.style.display = signedIn ? 'none' : '';
+    el.historyBtn.style.display = (currentRole === 'admin') ? '' : 'none';
+
     renderGrid();
     renderPendingList();
+  }
+
+  // Admin (MACA) can do anything. A profesor can only create/edit their
+  // own "Profesor / clase" bookings — never someone else's, and never a
+  // different type. A viewer can never write at all. Enforced again
+  // server-side via RLS; this just keeps the UI from offering actions
+  // that would be rejected anyway.
+  function canEditReservation(res){
+    if(!currentSession) return false;
+    if(currentRole === 'admin') return true;
+    if(currentRole === 'profesor') return !!res && res.type === 'profesor' && res.name === currentProfName;
+    return false;
   }
 
   function openAuthModal(){
@@ -893,6 +963,77 @@
   sb.auth.onAuthStateChange(function(event, session){
     applyAuthState(session);
   });
+
+  el.loginPromptBtn.addEventListener('click', openAuthModal);
+
+  // ---------- history / audit log (admin only) ----------
+  var HISTORY_FIELD_LABELS = { date:'Fecha', court:'Cancha', start:'Hora inicio', duration:'Duración', name:'Nombre', type:'Tipo', status:'Estado', notes:'Notas' };
+
+  function describeSnapshot(data){
+    if(!data) return '(sin datos)';
+    var endLabel = slotLabel(Math.min(data.start + data.duration, SLOTS_PER_DAY));
+    var who = data.name || TYPE_LABEL[data.type] || data.type;
+    return 'Cancha ' + data.court + ' · ' + data.date + ' · ' + slotLabel(data.start) + '–' + endLabel + ' · ' + who + ' (' + (TYPE_LABEL[data.type] || data.type) + ', ' + data.status + ')';
+  }
+
+  function diffSnapshots(oldD, newD){
+    var changes = [];
+    Object.keys(HISTORY_FIELD_LABELS).forEach(function(f){
+      var ov = oldD ? oldD[f] : undefined;
+      var nv = newD ? newD[f] : undefined;
+      if(JSON.stringify(ov) !== JSON.stringify(nv)){
+        var fmt = function(v){
+          if(f === 'start' && (v || v===0)) return slotLabel(v);
+          return (v===undefined || v===null || v==='') ? '(vacío)' : String(v);
+        };
+        changes.push(HISTORY_FIELD_LABELS[f] + ': ' + fmt(ov) + ' → ' + fmt(nv));
+      }
+    });
+    return changes;
+  }
+
+  function renderHistoryList(entries){
+    if(!entries.length){
+      el.historyList.innerHTML = '<div class="empty-note">Todavía no hay movimientos registrados.</div>';
+      return;
+    }
+    el.historyList.innerHTML = '';
+    var actionLabel = { created:'🟢 Creada', updated:'✏️ Editada', deleted:'🗑️ Eliminada' };
+    entries.forEach(function(h){
+      var row = document.createElement('div');
+      row.style.cssText = 'border:1px solid var(--line); border-radius:8px; padding:10px 12px; font-size:13px;';
+      var when = new Date(h.changed_at).toLocaleString('es-AR');
+      var html = '<div style="font-weight:700; margin-bottom:4px;">' + (actionLabel[h.action] || h.action) +
+        ' <span style="font-weight:400; color:var(--ink-soft);">· ' + when + '</span></div>';
+      if(h.action === 'created'){
+        html += '<div>' + describeSnapshot(h.new_data) + '</div>';
+      } else if(h.action === 'deleted'){
+        html += '<div>Era: ' + describeSnapshot(h.old_data) + '</div>';
+      } else {
+        html += '<div>' + describeSnapshot(h.new_data) + '</div>';
+        var changes = diffSnapshots(h.old_data, h.new_data);
+        if(changes.length){
+          html += '<div style="margin-top:6px; color:var(--ink-soft);">' + changes.join('<br>') + '</div>';
+        }
+      }
+      row.innerHTML = html;
+      el.historyList.appendChild(row);
+    });
+  }
+
+  el.historyBtn.addEventListener('click', function(){
+    el.historyBackdrop.classList.add('open');
+    el.historyList.innerHTML = '<div class="empty-note">Cargando…</div>';
+    sb.from('reservation_history').select('*').order('changed_at', { ascending: false }).limit(300).then(function(res){
+      if(res.error){
+        el.historyList.innerHTML = '<div class="empty-note">No se pudo cargar el historial.</div>';
+        return;
+      }
+      renderHistoryList(res.data || []);
+    });
+  });
+  el.historyClose.addEventListener('click', function(){ el.historyBackdrop.classList.remove('open'); });
+  el.historyBackdrop.addEventListener('click', function(e){ if(e.target === el.historyBackdrop) el.historyBackdrop.classList.remove('open'); });
 
   // populate court + start-time selects once
   COURTS.forEach(function(c){
@@ -955,6 +1096,7 @@
     safeSetItem('deltaTennisLastDate', state.selectedDate);
     var isToday = (state.selectedDate === localISODate(new Date()));
     el.todayBtn.classList.toggle('is-active', isToday);
+    el.todayBtn.style.display = isToday ? '' : 'none';
   }
 
   // ---------- schedule grid rendering ----------
@@ -1010,16 +1152,24 @@
         } else if(res.start === s){
           occupiedSlots++;
           var block = document.createElement('div');
-          block.className = 'reservation type-'+res.type+' st-'+res.status;
-          block.style.gridColumn = c;
-          block.style.gridRow = (s+2)+' / span '+res.duration;
           var endLabel = slotLabel(Math.min(res.start+res.duration, SLOTS_PER_DAY));
-          block.innerHTML = '<span class="name"></span><span class="meta"></span>';
-          block.querySelector('.name').textContent = res.name || TYPE_LABEL[res.type] || 'Reserva';
-          block.querySelector('.meta').textContent = slotLabel(res.start)+'–'+endLabel+' · '+TYPE_LABEL[res.type];
-          block.addEventListener('click', (function(reservation){
-            return function(){ openModalEdit(reservation); };
-          })(res));
+          if(currentRole === 'viewer'){
+            block.className = 'reservation type-mantenimiento';
+            block.style.gridColumn = c;
+            block.style.gridRow = (s+2)+' / span '+res.duration;
+            block.innerHTML = '<span class="name">Ocupado</span>';
+            block.style.cursor = 'default';
+          } else {
+            block.className = 'reservation type-'+res.type+' st-'+res.status;
+            block.style.gridColumn = c;
+            block.style.gridRow = (s+2)+' / span '+res.duration;
+            block.innerHTML = '<span class="name"></span><span class="meta"></span>';
+            block.querySelector('.name').textContent = res.name || TYPE_LABEL[res.type] || 'Reserva';
+            block.querySelector('.meta').textContent = slotLabel(res.start)+'–'+endLabel+' · '+TYPE_LABEL[res.type];
+            block.addEventListener('click', (function(reservation){
+              return function(){ openModalEdit(reservation); };
+            })(res));
+          }
           grid.appendChild(block);
         } else {
           occupiedSlots++;
@@ -1079,8 +1229,12 @@
   // ---------- modal ----------
   function openModalNew(court, startSlot){
     if(isReadOnly){
-      showToast('Iniciá sesión para cargar reservas.', true);
-      openAuthModal();
+      if(currentSession){
+        showToast('Tu usuario no puede cargar reservas.', true);
+      } else {
+        showToast('Iniciá sesión para cargar reservas.', true);
+        openAuthModal();
+      }
       return;
     }
     state.editingId = null;
@@ -1097,14 +1251,30 @@
     el.fRepeatWeek.checked = false;
     el.repeatField.style.display = '';
     el.btnDelete.style.display = 'none';
+    el.btnSave.style.display = '';
     el.conflictWarning.classList.remove('show');
+
+    if(currentRole === 'profesor'){
+      el.nameField.style.display = 'none';
+      el.typeStatusRow.style.display = 'none';
+      el.fNameSelect.value = currentProfName || '';
+    } else {
+      el.nameField.style.display = '';
+      el.typeStatusRow.style.display = '';
+    }
+
     updateNameFieldMode();
     el.modalBackdrop.classList.add('open');
     setTimeout(function(){
-      (el.fType.value === 'profesor' ? el.fNameSelect : el.fName).focus();
+      if(currentRole === 'profesor'){ el.fCourt.focus(); }
+      else { (el.fType.value === 'profesor' ? el.fNameSelect : el.fName).focus(); }
     }, 30);
   }
   function openModalEdit(res){
+    if(currentRole === 'profesor' && !canEditReservation(res)){
+      showToast('Esa reserva no es tuya.', true);
+      return;
+    }
     state.editingId = res.id;
     el.modalTitle.textContent = 'Editar reserva';
     el.fCourt.value = res.court;
@@ -1126,16 +1296,26 @@
     el.fStatus.value = res.status;
     el.fNotes.value = res.notes || '';
     el.repeatField.style.display = 'none';
-    el.btnDelete.style.display = '';
     el.conflictWarning.classList.remove('show');
+
+    if(currentRole === 'profesor'){
+      el.nameField.style.display = 'none';
+      el.typeStatusRow.style.display = 'none';
+    } else {
+      el.nameField.style.display = '';
+      el.typeStatusRow.style.display = '';
+    }
     updateNameFieldMode();
-    if(isReadOnly){
+
+    var editable = canEditReservation(res);
+    if(!editable){
       el.btnSave.style.display = 'none';
       el.btnDelete.style.display = 'none';
       el.conflictWarning.textContent = 'Estás viendo en modo solo lectura: no podés modificar esta reserva.';
       el.conflictWarning.classList.add('show');
     } else {
       el.btnSave.style.display = '';
+      el.btnDelete.style.display = '';
     }
     el.modalBackdrop.classList.add('open');
   }
@@ -1180,6 +1360,11 @@
       status: el.fStatus.value,
       notes: el.fNotes.value.trim()
     };
+    if(currentRole === 'profesor'){
+      payload.type = 'profesor';
+      payload.name = currentProfName;
+      payload.status = 'confirmada';
+    }
     if(payload.start + payload.duration > SLOTS_PER_DAY){
       el.conflictWarning.textContent = 'El turno se pasa del horario de cierre (21:00).';
       el.conflictWarning.classList.add('show');
