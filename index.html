@@ -29,29 +29,15 @@
     --mantenimiento:#BA3B2E;
     --daom:#3E6B8A;
     --marianistas:#7C6A9C;
+    --torneo:#2E8B8B;
     --radius:10px;
     --radius-sm:6px;
     --font-display:'Space Grotesk', system-ui, -apple-system, 'Segoe UI', sans-serif;
     --font-body:'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
     --shadow: 0 1px 2px rgba(24,38,32,0.06), 0 6px 20px rgba(24,38,32,0.06);
   }
-  @media (prefers-color-scheme: dark){
-    :root:not([data-theme="light"]){
-      --bg:#12140F;
-      --surface:#1C2019;
-      --surface-soft:#20241C;
-      --ink:#EDECE4;
-      --ink-soft:#A2A99B;
-      --line:#33372C;
-      --line-strong:#454A3B;
-      --accent:#B7CE45;
-      --accent-ink:#182207;
-      --danger:#E28874;
-      --danger-soft:#3A2420;
-      --pending-stripe: rgba(237,236,228,0.14);
-      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 6px 20px rgba(0,0,0,0.35);
-    }
-  }
+  /* Modo oscuro automático desactivado: la app siempre usa el fondo claro,
+     sin importar la configuración del teléfono/navegador. */
   :root[data-theme="dark"]{
     --bg:#12140F;
     --surface:#1C2019;
@@ -310,7 +296,7 @@
   .time-label{
     border-right:1px solid var(--line-strong);
     border-bottom:1px solid var(--line);
-    font-size:10.5px;
+    font-size:11.5px;
     color:var(--ink-soft);
     display:flex;
     align-items:flex-start;
@@ -358,6 +344,7 @@
   .reservation.type-mantenimiento{ background:var(--mantenimiento); }
   .reservation.type-daom{ background:var(--daom); }
   .reservation.type-marianistas{ background:var(--marianistas); }
+  .reservation.type-torneo{ background:var(--torneo); }
   .reservation.st-pendiente{
     background-image: repeating-linear-gradient(135deg, var(--pending-stripe) 0 6px, transparent 6px 12px);
     border-style:dashed;
@@ -574,7 +561,8 @@
           <div class="lg-row"><span class="swatch" style="background:var(--alquiler)"></span>Alquiler</div>
           <div class="lg-row"><span class="swatch" style="background:var(--mantenimiento)"></span>Mantenimiento / bloqueada</div>
           <div class="lg-row"><span class="swatch" style="background:var(--daom)"></span>DAOM</div>
-          <div class="lg-row"><span class="swatch" style="background:var(--marianistas)"></span>Marianistas</div>
+          <div class="lg-row"><span class="swatch" style="background:var(--marianistas)"></span>Marianista</div>
+          <div class="lg-row"><span class="swatch" style="background:var(--torneo)"></span>Torneo</div>
           <div class="lg-row"><span class="swatch pending"></span>Pendiente de aprobación</div>
         </div>
       </div>
@@ -619,22 +607,23 @@
           </select>
         </div>
       </div>
-      <div class="field" id="nameField">
-        <label for="fName" id="fNameLabel">Nombre (opcional)</label>
-        <select id="fNameSelect" style="display:none;"></select>
-        <input type="text" id="fName" placeholder="Ej: Gastón, Escuela, clase particular...">
+      <div class="field" id="typeField">
+        <label for="fType">Tipo</label>
+        <select id="fType">
+          <option value="profesor">Profesor / clase</option>
+          <option value="escuela">Escuela</option>
+          <option value="alquiler">Alquiler</option>
+          <option value="mantenimiento">Mantenimiento / bloqueada</option>
+          <option value="daom">DAOM</option>
+          <option value="marianistas">Marianista</option>
+          <option value="torneo">Torneo</option>
+        </select>
       </div>
       <div class="field-row" id="typeStatusRow">
-        <div class="field">
-          <label for="fType">Tipo</label>
-          <select id="fType">
-            <option value="profesor">Profesor / clase</option>
-            <option value="escuela">Escuela</option>
-            <option value="alquiler">Alquiler</option>
-            <option value="mantenimiento">Mantenimiento / bloqueada</option>
-            <option value="daom">DAOM</option>
-            <option value="marianistas">Marianistas</option>
-          </select>
+        <div class="field" id="nameField">
+          <label for="fName" id="fNameLabel">Nombre (opcional)</label>
+          <select id="fNameSelect" style="display:none;"></select>
+          <input type="text" id="fName" placeholder="Ej: Gastón, Escuela, clase particular...">
         </div>
         <div class="field">
           <label for="fStatus">Estado</label>
@@ -731,7 +720,7 @@
   var TYPE_LABEL = {
     profesor:"Profesor / clase", escuela:"Escuela",
     alquiler:"Alquiler", mantenimiento:"Mantenimiento",
-    daom:"DAOM", marianistas:"Marianistas"
+    daom:"DAOM", marianistas:"Marianista", torneo:"Torneo"
   };
   var PROFESSOR_NAMES = ["FACU","FRANCIS","GASTON","HERNAN","LAU","LAUCHA","LEO","LUCHO","MACA","MALE","NEGRO","NICO","PATO","SANTY","SOLMAU","VALEN"];
   var CUSTOM_NAME_VALUE = "__otro__";
@@ -822,6 +811,7 @@
     summaryRow: document.getElementById('summaryRow'),
     pendingList: document.getElementById('pendingList'),
     nameField: document.getElementById('nameField'),
+    typeField: document.getElementById('typeField'),
     typeStatusRow: document.getElementById('typeStatusRow'),
     pendingPanel: document.getElementById('pendingPanel'),
     legendPanel: document.getElementById('legendPanel'),
@@ -1353,10 +1343,12 @@
 
     if(currentRole === 'profesor'){
       el.nameField.style.display = 'none';
+      el.typeField.style.display = 'none';
       el.typeStatusRow.style.display = 'none';
       el.fNameSelect.value = currentProfName || '';
     } else {
       el.nameField.style.display = '';
+      el.typeField.style.display = '';
       el.typeStatusRow.style.display = '';
     }
 
@@ -1364,7 +1356,7 @@
     el.modalBackdrop.classList.add('open');
     setTimeout(function(){
       if(currentRole === 'profesor'){ el.fCourt.focus(); }
-      else { (el.fType.value === 'profesor' ? el.fNameSelect : el.fName).focus(); }
+      else { el.fType.focus(); }
     }, 30);
   }
   function openModalEdit(res){
@@ -1397,9 +1389,11 @@
 
     if(currentRole === 'profesor'){
       el.nameField.style.display = 'none';
+      el.typeField.style.display = 'none';
       el.typeStatusRow.style.display = 'none';
     } else {
       el.nameField.style.display = '';
+      el.typeField.style.display = '';
       el.typeStatusRow.style.display = '';
     }
     updateNameFieldMode();
