@@ -753,7 +753,7 @@
   }
 
   var state = {
-    selectedDate: safeGetItem('deltaTennisLastDate') || localISODate(new Date()),
+    selectedDate: localISODate(new Date()),
     reservations: [],       // reservations for selectedDate (derived from allReservations)
     pending: [],            // all pending reservations, any date (derived from allReservations)
     editingId: null
@@ -1180,7 +1180,6 @@
   function renderDateNav(){
     el.curDateLabel.textContent = formatHeaderDate(state.selectedDate);
     el.datePicker.value = state.selectedDate;
-    safeSetItem('deltaTennisLastDate', state.selectedDate);
     var isToday = (state.selectedDate === localISODate(new Date()));
     el.todayBtn.classList.toggle('is-active', isToday);
     el.todayBtn.style.display = isToday ? '' : 'none';
